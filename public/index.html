@@ -16,6 +16,38 @@
         </div>
     </div>
 
+    <div id="create-quiz" class="screen hidden">
+        <h2>Criar Questionário Público</h2>
+        <input type="text" id="quiz-title" placeholder="Título do questionário">
+        <input type="text" id="quiz-topic" placeholder="Digite o assunto do questionário para gerar automaticamente">
+        <div class="quiz-input-container">
+            <textarea id="quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
+            <button id="examples-btn" onclick="toggleExamples()">Exemplos</button>
+        </div>
+        <div id="examples-panel" class="hidden">
+            <h3>Exemplos de Formato:</h3>
+            <div class="example">
+                <h4>Texto Simples:</h4>
+                <pre>Qual é a capital do Brasil?,Rio de Janeiro,São Paulo,$Brasília,Salvador;</pre>
+            </div>
+            <div class="example">
+                <h4>Com Imagens:</h4>
+                <pre>Que animal é este?[img:https://exemplo.com/leao.jpg],Tigre,Leopardo,$Leão,Guepardo;</pre>
+            </div>
+        </div>
+        <button onclick="generateQuiz()">Gerar com IA</button>
+        <button onclick="savePublicQuiz()">Salvar Questionário</button>
+        <button onclick="showPublicQuizzes()">Voltar</button>
+    </div>
+
+    <div id="edit-quiz" class="screen hidden">
+        <h2>Editar Questionário</h2>
+        <input type="text" id="edit-quiz-title" placeholder="Título do questionário">
+        <textarea id="edit-quiz-questions"></textarea>
+        <button onclick="updateQuiz()">Salvar Alterações</button>
+        <button onclick="showPublicQuizzes()">Voltar</button>
+    </div>
+
     <div id="public-quizzes" class="screen hidden">
         <h2>Questionários Públicos</h2>
         <div class="search-bar">
@@ -26,94 +58,29 @@
         <button onclick="showInitialScreen()">Voltar</button>
     </div>
 
-    <div id="create-quiz" class="screen hidden">
-        <h2>Criar Questionário Público</h2>
-        <input type="text" id="quiz-title" placeholder="Título do questionário">
-        
-        <div class="quiz-format-toggle">
-            <button onclick="toggleQuizFormat('text')" class="active">Formato Texto</button>
-            <button onclick="toggleQuizFormat('form')">Formato Visual</button>
-        </div>
-
-        <div id="text-format" class="quiz-format">
-            <textarea id="quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
-        </div>
-
-        <div id="form-format" class="quiz-format hidden">
-            <div id="questions-container">
-                <!-- Template para uma pergunta -->
-                <div class="question-form" data-question="1">
-                    <h3>Pergunta 1</h3>
-                    <div class="form-group">
-                        <label>Pergunta:</label>
-                        <input type="text" class="question-text" placeholder="Digite a pergunta">
-                        <input type="text" class="question-image" placeholder="URL da imagem (opcional)">
-                    </div>
-                    <div class="form-group">
-                        <label>Respostas:</label>
-                        <div class="answer-input">
-                            <input type="text" class="answer-text" placeholder="Resposta 1">
-                            <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
-                            <input type="radio" name="correct-1" value="0"> Correta
-                        </div>
-                        <div class="answer-input">
-                            <input type="text" class="answer-text" placeholder="Resposta 2">
-                            <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
-                            <input type="radio" name="correct-1" value="1"> Correta
-                        </div>
-                        <div class="answer-input">
-                            <input type="text" class="answer-text" placeholder="Resposta 3">
-                            <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
-                            <input type="radio" name="correct-1" value="2"> Correta
-                        </div>
-                        <div class="answer-input">
-                            <input type="text" class="answer-text" placeholder="Resposta 4">
-                            <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
-                            <input type="radio" name="correct-1" value="3"> Correta
-                        </div>
-                    </div>
-                    <button class="delete-question" onclick="deleteQuestion(this)">Deletar Pergunta</button>
-                </div>
-            </div>
-            <button onclick="addNewQuestion()" class="add-question-btn">+ Adicionar Pergunta</button>
-        </div>
-
-        <div class="quiz-actions">
-            <button onclick="savePublicQuiz()">Salvar Questionário</button>
-            <button onclick="showPublicQuizzes()">Voltar</button>
-        </div>
-    </div>
-
-    <div id="edit-quiz" class="screen hidden">
-        <h2>Editar Questionário</h2>
-        <input type="text" id="edit-quiz-title" placeholder="Título do questionário">
-        <textarea id="edit-quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
-        <button onclick="updatePublicQuiz()">Atualizar Questionário</button>
-        <button onclick="showPublicQuizzes()">Voltar</button>
-    </div>
-
     <div id="create-room" class="screen hidden">
-        <h2>Criar Nova Sala</h2>
-        <input type="text" id="host-name" placeholder="Seu nome">
-        <input type="number" id="time-per-question" placeholder="Tempo por pergunta (segundos)" value="30" min="10" max="120">
-        <textarea id="questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
+        <h2>Criar Sala</h2>
+        <div class="room-options">
+            <label for="time-per-question">Tempo por pergunta (segundos):</label>
+            <input type="number" id="time-per-question" min="10" max="120" value="30">
+            <textarea id="create-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
+        </div>
         <button onclick="createRoom()">Criar Sala</button>
         <button onclick="showInitialScreen()">Voltar</button>
     </div>
 
     <div id="join-room" class="screen hidden">
         <h2>Entrar em Sala</h2>
+        <input type="text" id="room-code" placeholder="Código da sala">
         <input type="text" id="player-name" placeholder="Seu nome">
-        <input type="text" id="room-code" placeholder="Código da sala (5 números)">
         <button onclick="joinRoom()">Entrar</button>
         <button onclick="showInitialScreen()">Voltar</button>
     </div>
 
     <div id="waiting-room" class="screen hidden">
         <h2>Sala de Espera</h2>
-        <div id="room-code-display"></div>
-        <h3>Jogadores:</h3>
-        <ul id="players-list"></ul>
+        <div id="room-info"></div>
+        <div id="players-list"></div>
         <div id="host-controls" class="hidden">
             <button onclick="startGame()">Iniciar Jogo</button>
         </div>
@@ -123,22 +90,22 @@
     <div id="game-screen" class="screen hidden">
         <div id="countdown" class="hidden"></div>
         <div id="question-container">
-            <div id="question-display" class="image-container"></div>
+            <div id="question-display"></div>
             <div id="timer-display"></div>
         </div>
         <div id="answers-grid" class="hidden">
-            <button class="answer-btn image-container" id="answer-0" data-index="0"></button>
-            <button class="answer-btn image-container" id="answer-1" data-index="1"></button>
-            <button class="answer-btn image-container" id="answer-2" data-index="2"></button>
-            <button class="answer-btn image-container" id="answer-3" data-index="3"></button>
+            <button class="answer-btn" id="answer-0" data-index="0"></button>
+            <button class="answer-btn" id="answer-1" data-index="1"></button>
+            <button class="answer-btn" id="answer-2" data-index="2"></button>
+            <button class="answer-btn" id="answer-3" data-index="3"></button>
         </div>
         <div id="result-display" class="hidden">
             <h2>Resultado</h2>
             <div id="correct-answer"></div>
             <div id="scores"></div>
-        </div>
-        <div id="host-next" class="hidden">
-            <button onclick="nextQuestion()">Próxima Pergunta</button>
+            <div id="host-next" class="hidden">
+                <button onclick="nextQuestion()">Próxima Pergunta</button>
+            </div>
         </div>
     </div>
 
