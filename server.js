@@ -3,13 +3,19 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const path = require('path');
-const { Configuration, OpenAIApi } = require('openai');
+const axios = require('axios');
 
 // OpenAI configuration
-const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY
+const OPENAI_API_KEY = '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';
+
+// Configuração direta do Axios para a API da OpenAI
+const openaiAxios = axios.create({
+    baseURL: 'https://api.openai.com/v1',
+    headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+    }
 });
-const openai = new OpenAIApi(configuration);
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -42,6 +48,17 @@ app.get('/api/quizzes', (req, res) => {
         );
     }
     res.json(quizzes);
+});
+
+app.get('/api/quizzes/:id', (req, res) => {
+    const { id } = req.params;
+    const quiz = publicQuizzes.get(id);
+    
+    if (quiz) {
+        res.json(quiz);
+    } else {
+        res.status(404).json({ error: 'Questionário não encontrado' });
+    }
 });
 
 app.put('/api/quizzes/:id', (req, res) => {
@@ -77,6 +94,7 @@ app.delete('/api/quizzes/:id', (req, res) => {
     }
 });
 
+// Endpoint para gerar questionário com IA
 app.post('/api/generate-quiz', async (req, res) => {
     try {
         const { subject } = req.body;
@@ -85,17 +103,17 @@ app.post('/api/generate-quiz', async (req, res) => {
         Formato: pergunta1,resposta1,resposta2,$resposta3,resposta4;pergunta2,resposta1,$resposta2,resposta3,resposta4
         O $ indica a resposta correta. Não inclua números nas perguntas.`;
 
-        const completion = await openai.createCompletion({
+        const response = await openaiAxios.post('/completions', {
             model: "text-davinci-003",
             prompt: prompt,
             max_tokens: 1000,
-            temperature: 0.7,
+            temperature: 0.7
         });
 
-        const generatedQuiz = completion.data.choices[0].text.trim();
+        const generatedQuiz = response.data.choices[0].text.trim();
         res.json({ questions: generatedQuiz });
     } catch (error) {
-        console.error('Erro ao gerar quiz:', error);
+        console.error('Erro ao gerar quiz:', error.response?.data || error.message);
         res.status(500).json({ error: 'Erro ao gerar quiz' });
     }
 });

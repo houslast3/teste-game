@@ -176,9 +176,20 @@ async function deleteQuiz(quizId) {
     }
 }
 
-function usePublicQuiz(quiz) {
-    document.getElementById('questions').value = quiz.questions;
-    showCreateRoom();
+async function usePublicQuiz(quizId) {
+    try {
+        const response = await fetch(`/api/quizzes/${quizId}`);
+        if (!response.ok) {
+            throw new Error('Erro ao carregar questionário');
+        }
+        const quiz = await response.json();
+        
+        // Copiar as perguntas para o formulário de criar sala
+        document.getElementById('questions').value = quiz.questions;
+        showCreateRoom();
+    } catch (error) {
+        alert('Erro ao carregar questionário');
+    }
 }
 
 // Funções de criação e entrada em sala
