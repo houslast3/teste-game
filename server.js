@@ -6,7 +6,7 @@ const path = require('path');
 const axios = require('axios');
 
 // OpenAI configuration
-const OPENAI_API_KEY = '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';
+const OPENAI_API_KEY = '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';
 
 // Configuração direta do Axios para a API da OpenAI
 const openaiAxios = axios.create({
