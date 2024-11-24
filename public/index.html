@@ -12,13 +12,41 @@
         <div class="options">
             <button onclick="showCreateRoom()">Criar Sala</button>
             <button onclick="showJoinRoom()">Entrar em Sala</button>
+            <button onclick="showPublicQuizzes()">Questionários Públicos</button>
         </div>
+    </div>
+
+    <div id="public-quizzes" class="screen hidden">
+        <h2>Questionários Públicos</h2>
+        <div class="search-bar">
+            <input type="text" id="quiz-search" placeholder="Pesquisar questionários...">
+        </div>
+        <button class="add-quiz-btn" onclick="showCreateQuiz()">+ Novo Questionário</button>
+        <div id="quizzes-list"></div>
+        <button onclick="showInitialScreen()">Voltar</button>
+    </div>
+
+    <div id="create-quiz" class="screen hidden">
+        <h2>Criar Questionário Público</h2>
+        <input type="text" id="quiz-title" placeholder="Título do questionário">
+        <textarea id="quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
+        <button onclick="savePublicQuiz()">Salvar Questionário</button>
+        <button onclick="showPublicQuizzes()">Voltar</button>
+    </div>
+
+    <div id="edit-quiz" class="screen hidden">
+        <h2>Editar Questionário</h2>
+        <input type="text" id="edit-quiz-title" placeholder="Título do questionário">
+        <textarea id="edit-quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
+        <button onclick="updatePublicQuiz()">Atualizar Questionário</button>
+        <button onclick="showPublicQuizzes()">Voltar</button>
     </div>
 
     <div id="create-room" class="screen hidden">
         <h2>Criar Nova Sala</h2>
         <input type="text" id="host-name" placeholder="Seu nome">
-        <textarea id="questions" placeholder="Digite as perguntas no formato: pergunta1,resposta1,resposta2,$resposta3,resposta4;"></textarea>
+        <input type="number" id="time-per-question" placeholder="Tempo por pergunta (segundos)" value="30" min="10" max="120">
+        <textarea id="questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
         <button onclick="createRoom()">Criar Sala</button>
         <button onclick="showInitialScreen()">Voltar</button>
     </div>
@@ -39,11 +67,15 @@
         <div id="host-controls" class="hidden">
             <button onclick="startGame()">Iniciar Jogo</button>
         </div>
+        <button onclick="leaveRoom()">Sair da Sala</button>
     </div>
 
     <div id="game-screen" class="screen hidden">
         <div id="countdown" class="hidden"></div>
-        <div id="question-display"></div>
+        <div id="question-container">
+            <div id="question-display"></div>
+            <div id="timer-display"></div>
+        </div>
         <div id="answers-grid" class="hidden">
             <button class="answer-btn" id="answer-0" data-index="0"></button>
             <button class="answer-btn" id="answer-1" data-index="1"></button>
@@ -54,9 +86,9 @@
             <h2>Resultado</h2>
             <div id="correct-answer"></div>
             <div id="scores"></div>
-        </div>
-        <div id="host-next" class="hidden">
-            <button onclick="nextQuestion()">Próxima Pergunta</button>
+            <div id="host-next" class="hidden">
+                <button onclick="nextQuestion()">Próxima Pergunta</button>
+            </div>
         </div>
     </div>
 

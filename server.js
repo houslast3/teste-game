@@ -5,17 +5,58 @@ const io = require('socket.io')(http);
 const path = require('path');
 
 app.use(express.static('public'));
+app.use(express.json());
 
 const rooms = new Map();
+const publicQuizzes = new Map();
 
 function generateRoomCode() {
     return Math.floor(10000 + Math.random() * 90000).toString();
 }
 
+function generateQuizId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// API endpoints para questionários públicos
+app.post('/api/quizzes', (req, res) => {
+    const { title, questions, userId } = req.body;
+    const quizId = generateQuizId();
+    publicQuizzes.set(quizId, { id: quizId, title, questions, userId, createdAt: Date.now() });
+    res.json({ id: quizId });
+});
+
+app.get('/api/quizzes', (req, res) => {
+    const { search } = req.query;
+    let quizzes = Array.from(publicQuizzes.values());
+    if (search) {
+        quizzes = quizzes.filter(quiz => 
+            quiz.title.toLowerCase().includes(search.toLowerCase())
+        );
+    }
+    res.json(quizzes);
+});
+
+app.put('/api/quizzes/:id', (req, res) => {
+    const { id } = req.params;
+    const { title, questions, userId } = req.body;
+    if (publicQuizzes.has(id)) {
+        const quiz = publicQuizzes.get(id);
+        if (quiz.userId === userId) {
+            publicQuizzes.set(id, { ...quiz, title, questions });
+            res.json({ success: true });
+        } else {
+            res.status(403).json({ error: 'Não autorizado' });
+        }
+    } else {
+        res.status(404).json({ error: 'Questionário não encontrado' });
+    }
+});
+
 io.on('connection', (socket) => {
     console.log('User connected');
 
-    socket.on('createRoom', ({ hostName, questions }) => {
+    socket.on('createRoom', ({ hostName, questions, timePerQuestion }) => {
         const roomCode = generateRoomCode();
         const room = {
             host: socket.id,
@@ -24,7 +65,9 @@ io.on('connection', (socket) => {
             questions: questions.split(';').filter(q => q.trim()),
             currentQuestion: 0,
             answers: new Map(),
-            inGame: false
+            inGame: false,
+            timePerQuestion,
+            timer: null
         };
         rooms.set(roomCode, room);
         socket.join(roomCode);
@@ -51,7 +94,7 @@ io.on('connection', (socket) => {
             room.currentQuestion = 0;
             io.to(roomCode).emit('gameStarting');
             setTimeout(() => {
-                sendQuestion(roomCode);
+                startQuestion(roomCode);
             }, 4000);
         }
     });
@@ -62,22 +105,8 @@ io.on('connection', (socket) => {
             room.answers.set(socket.id, answerIndex);
             
             if (room.answers.size === room.players.length) {
-                const currentQuestionData = room.questions[room.currentQuestion];
-                const [question, ...answers] = currentQuestionData.split(',');
-                const correctIndex = answers.findIndex(a => a.startsWith('$'));
-                
-                room.players.forEach(player => {
-                    if (room.answers.get(player.id) === correctIndex) {
-                        player.score += 100;
-                    }
-                });
-
-                io.to(roomCode).emit('showResults', {
-                    correctIndex,
-                    players: room.players
-                });
-
-                room.answers.clear();
+                clearTimeout(room.timer);
+                showResults(roomCode);
             }
         }
     });
@@ -87,10 +116,9 @@ io.on('connection', (socket) => {
         if (room && socket.id === room.host) {
             room.currentQuestion++;
             if (room.currentQuestion < room.questions.length) {
-                sendQuestion(roomCode);
+                startQuestion(roomCode);
             } else {
-                io.to(roomCode).emit('gameOver', { players: room.players });
-                rooms.delete(roomCode);
+                endGame(roomCode);
             }
         }
     });
@@ -111,16 +139,64 @@ io.on('connection', (socket) => {
     });
 });
 
-function sendQuestion(roomCode) {
+function startQuestion(roomCode) {
     const room = rooms.get(roomCode);
     if (room) {
+        room.answers.clear();
         const questionData = room.questions[room.currentQuestion];
         const [question, ...answers] = questionData.split(',');
         const formattedAnswers = answers.map(a => a.replace('$', ''));
         io.to(roomCode).emit('newQuestion', {
             question,
-            answers: formattedAnswers
+            answers: formattedAnswers,
+            timeLeft: room.timePerQuestion
         });
+
+        let timeLeft = room.timePerQuestion;
+        const timerInterval = setInterval(() => {
+            timeLeft--;
+            io.to(roomCode).emit('updateTimer', timeLeft);
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                showResults(roomCode);
+            }
+        }, 1000);
+
+        room.timer = setTimeout(() => {
+            clearInterval(timerInterval);
+            if (room.answers.size < room.players.length) {
+                showResults(roomCode);
+            }
+        }, room.timePerQuestion * 1000);
+    }
+}
+
+function showResults(roomCode) {
+    const room = rooms.get(roomCode);
+    if (room) {
+        const currentQuestionData = room.questions[room.currentQuestion];
+        const [question, ...answers] = currentQuestionData.split(',');
+        const correctIndex = answers.findIndex(a => a.startsWith('$'));
+        
+        room.players.forEach(player => {
+            const playerAnswer = room.answers.get(player.id);
+            if (playerAnswer === correctIndex) {
+                player.score += 100;
+            }
+        });
+
+        io.to(roomCode).emit('showResults', {
+            correctIndex,
+            players: room.players
+        });
+    }
+}
+
+function endGame(roomCode) {
+    const room = rooms.get(roomCode);
+    if (room) {
+        io.to(roomCode).emit('gameOver', { players: room.players });
+        rooms.delete(roomCode);
     }
 }
 

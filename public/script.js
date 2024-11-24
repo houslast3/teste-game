@@ -2,6 +2,10 @@ const socket = io();
 
 let currentRoom = null;
 let isHost = false;
+let userId = localStorage.getItem('userId') || Date.now().toString(36);
+let currentQuizId = null;
+
+localStorage.setItem('userId', userId);
 
 // Funções de navegação entre telas
 function showScreen(screenId) {
@@ -21,17 +25,123 @@ function showJoinRoom() {
     showScreen('join-room');
 }
 
+function showPublicQuizzes() {
+    showScreen('public-quizzes');
+    loadPublicQuizzes();
+}
+
+function showCreateQuiz() {
+    showScreen('create-quiz');
+}
+
+// Funções para questionários públicos
+async function loadPublicQuizzes() {
+    const searchTerm = document.getElementById('quiz-search')?.value || '';
+    const response = await fetch(`/api/quizzes?search=${encodeURIComponent(searchTerm)}`);
+    const quizzes = await response.json();
+    
+    const quizzesList = document.getElementById('quizzes-list');
+    quizzesList.innerHTML = '';
+    
+    quizzes.forEach(quiz => {
+        const card = document.createElement('div');
+        card.className = `quiz-card ${quiz.userId === userId ? 'own-quiz' : ''}`;
+        
+        card.innerHTML = `
+            <div class="title">${quiz.title}</div>
+            ${quiz.userId === userId ? 
+                `<button class="edit-btn" onclick="editQuiz('${quiz.id}')">Editar</button>` : 
+                ''}
+        `;
+        
+        if (quiz.userId !== userId) {
+            card.onclick = () => usePublicQuiz(quiz);
+        }
+        
+        quizzesList.appendChild(card);
+    });
+}
+
+async function savePublicQuiz() {
+    const title = document.getElementById('quiz-title').value.trim();
+    const questions = document.getElementById('quiz-questions').value.trim();
+    
+    if (!title || !questions) {
+        alert('Por favor, preencha todos os campos');
+        return;
+    }
+    
+    const response = await fetch('/api/quizzes', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            title,
+            questions,
+            userId
+        })
+    });
+    
+    if (response.ok) {
+        showPublicQuizzes();
+    }
+}
+
+async function editQuiz(quizId) {
+    const response = await fetch(`/api/quizzes/${quizId}`);
+    const quiz = await response.json();
+    
+    document.getElementById('edit-quiz-title').value = quiz.title;
+    document.getElementById('edit-quiz-questions').value = quiz.questions;
+    currentQuizId = quizId;
+    
+    showScreen('edit-quiz');
+}
+
+async function updatePublicQuiz() {
+    const title = document.getElementById('edit-quiz-title').value.trim();
+    const questions = document.getElementById('edit-quiz-questions').value.trim();
+    
+    if (!title || !questions) {
+        alert('Por favor, preencha todos os campos');
+        return;
+    }
+    
+    const response = await fetch(`/api/quizzes/${currentQuizId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            title,
+            questions,
+            userId
+        })
+    });
+    
+    if (response.ok) {
+        showPublicQuizzes();
+    }
+}
+
+function usePublicQuiz(quiz) {
+    document.getElementById('questions').value = quiz.questions;
+    showCreateRoom();
+}
+
 // Funções de criação e entrada em sala
 function createRoom() {
     const hostName = document.getElementById('host-name').value.trim();
     const questions = document.getElementById('questions').value.trim();
+    const timePerQuestion = parseInt(document.getElementById('time-per-question').value) || 30;
     
     if (!hostName || !questions) {
         alert('Por favor, preencha todos os campos');
         return;
     }
 
-    socket.emit('createRoom', { hostName, questions });
+    socket.emit('createRoom', { hostName, questions, timePerQuestion });
 }
 
 function joinRoom() {
@@ -44,6 +154,13 @@ function joinRoom() {
     }
 
     socket.emit('joinRoom', { roomCode, playerName });
+}
+
+function leaveRoom() {
+    if (currentRoom) {
+        socket.emit('leaveRoom', currentRoom);
+        showInitialScreen();
+    }
 }
 
 // Funções do jogo
@@ -60,6 +177,23 @@ function submitAnswer(answerIndex) {
 
 function nextQuestion() {
     socket.emit('nextQuestion', currentRoom);
+}
+
+// Funções auxiliares
+function parseContent(content) {
+    const imgMatch = content.match(/\[img:(.*?)\]/);
+    if (imgMatch) {
+        const imgUrl = imgMatch[1];
+        const text = content.replace(/\[img:.*?\]/, '').trim();
+        return {
+            text,
+            imgUrl
+        };
+    }
+    return {
+        text: content,
+        imgUrl: null
+    };
 }
 
 // Socket event listeners
@@ -105,8 +239,14 @@ socket.on('gameStarting', () => {
     }, 1000);
 });
 
-socket.on('newQuestion', ({ question, answers }) => {
-    document.getElementById('question-display').textContent = question;
+socket.on('newQuestion', ({ question, answers, timeLeft }) => {
+    const parsedQuestion = parseContent(question);
+    document.getElementById('question-display').innerHTML = `
+        ${parsedQuestion.text}
+        ${parsedQuestion.imgUrl ? `<br><img src="${parsedQuestion.imgUrl}" alt="Imagem da pergunta">` : ''}
+    `;
+    
+    document.getElementById('timer-display').textContent = `${timeLeft} segundos`;
     document.getElementById('result-display').classList.add('hidden');
     document.getElementById('answers-grid').classList.remove('hidden');
     
@@ -115,11 +255,19 @@ socket.on('newQuestion', ({ question, answers }) => {
     }
 
     answers.forEach((answer, index) => {
+        const parsedAnswer = parseContent(answer);
         const button = document.getElementById(`answer-${index}`);
-        button.textContent = answer;
+        button.innerHTML = `
+            ${parsedAnswer.imgUrl ? `<img src="${parsedAnswer.imgUrl}" alt="Imagem da resposta">` : ''}
+            ${parsedAnswer.text}
+        `;
         button.disabled = false;
         button.onclick = () => submitAnswer(index);
     });
+});
+
+socket.on('updateTimer', (timeLeft) => {
+    document.getElementById('timer-display').textContent = `${timeLeft} segundos`;
 });
 
 socket.on('showResults', ({ correctIndex, players }) => {
@@ -153,4 +301,9 @@ socket.on('error', ({ message }) => {
 socket.on('hostLeft', () => {
     alert('O host saiu da sala. O jogo foi encerrado.');
     showInitialScreen();
+});
+
+// Inicializar evento de pesquisa
+document.getElementById('quiz-search')?.addEventListener('input', (e) => {
+    loadPublicQuizzes();
 });
