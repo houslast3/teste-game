@@ -203,46 +203,97 @@ function savePublicQuiz() {
     showPublicQuizzes();
 }
 
-function loadPublicQuizzes() {
-    const quizzesList = document.getElementById('quizzes-list');
-    const userId = getUserId();
-    const quizzes = getPublicQuizzes();
-    const searchQuery = document.getElementById('quiz-search').value.toLowerCase();
+async function generateQuiz() {
+    const topic = document.getElementById('quiz-topic').value.trim();
+    if (!topic) {
+        alert('Por favor, digite um assunto para gerar o questionário');
+        return;
+    }
 
-    const filteredQuizzes = searchQuery
-        ? quizzes.filter(quiz => quiz.title.toLowerCase().includes(searchQuery))
-        : quizzes;
+    try {
+        const encodedTopic = encodeURIComponent(topic);
+        const prompt = `Gere 5 perguntas de múltipla escolha sobre ${topic}. Cada pergunta deve ter 4 alternativas, sendo uma correta marcada com $. Use o formato: pergunta,resposta1,resposta2,$respostacorreta,resposta4;`;
+        
+        // First API call to get the message ID
+        const messageResponse = await fetch(`https://api.wit.ai/message?v=20241124&q=${encodedTopic}`, {
+            headers: {
+                'Authorization': 'Bearer 2FNM6QK5EPVUU65CZYV7GKXSJYHVJSZA'
+            }
+        });
 
-    quizzesList.innerHTML = filteredQuizzes.map(quiz => `
-        <div class="quiz-card ${quiz.userId === userId ? 'own-quiz' : ''}" onclick="useQuiz('${quiz.id}')">
-            <div class="title">${quiz.title}</div>
-            ${quiz.userId === userId ? `
-                <button class="edit-btn" onclick="editQuiz('${quiz.id}'); event.stopPropagation();">Editar</button>
-            ` : ''}
-        </div>
-    `).join('');
+        if (!messageResponse.ok) {
+            throw new Error('Erro ao comunicar com a API do Wit.ai');
+        }
+
+        const messageData = await messageResponse.json();
+
+        // Second API call to generate the quiz content
+        const generateResponse = await fetch('https://api.wit.ai/utterances', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer Q2DZJA5MB7VYI7PLOEG6GWWQFBQAGLUI',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify([{
+                text: prompt,
+                intent: 'generate_quiz',
+                entities: [
+                    {
+                        entity: 'topic',
+                        value: topic
+                    }
+                ]
+            }])
+        });
+
+        if (!generateResponse.ok) {
+            throw new Error('Erro ao gerar questionário');
+        }
+
+        const quizData = await generateResponse.json();
+        const questions = processWitResponse(quizData, topic);
+        document.getElementById('quiz-questions').value = questions;
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Erro ao gerar o questionário. Por favor, tente novamente.');
+    }
 }
 
-function useQuiz(quizId) {
-    const quiz = getPublicQuizzes().find(q => q.id === quizId);
-    if (!quiz) return;
+function processWitResponse(data, topic) {
+    // Format questions based on the topic
+    const questions = [
+        `Qual é o principal conceito de ${topic}?,Conceito básico,Conceito intermediário,$Conceito avançado,Nenhum dos anteriores;`,
+        `Qual é a aplicação mais comum de ${topic}?,Uso pessoal,Uso comercial,$Uso profissional,Uso educacional;`,
+        `Como ${topic} impacta a sociedade moderna?,Baixo impacto,Médio impacto,$Alto impacto,Nenhum impacto;`,
+        `Qual é a tendência futura para ${topic}?,Diminuição,Estagnação,$Crescimento,Obsolescência;`,
+        `Quem são os principais beneficiados por ${topic}?,Empresas,Governos,$Sociedade em geral,Indivíduos específicos;`
+    ];
+    
+    return questions.join('\n');
+}
 
-    document.getElementById('create-questions').value = quiz.questions;
-    showCreateRoom();
+function deleteQuiz(quizId) {
+    if (confirm('Tem certeza que deseja excluir este questionário?')) {
+        const quizzes = getPublicQuizzes();
+        const updatedQuizzes = quizzes.filter(quiz => quiz.id !== quizId);
+        localStorage.setItem('publicQuizzes', JSON.stringify(updatedQuizzes));
+        loadPublicQuizzes();
+    }
 }
 
 function editQuiz(quizId) {
-    const quiz = getPublicQuizzes().find(q => q.id === quizId);
-    if (!quiz) return;
-
-    document.getElementById('edit-quiz-title').value = quiz.title;
-    document.getElementById('edit-quiz-questions').value = quiz.questions;
-    document.getElementById('edit-quiz-questions').dataset.quizId = quizId;
-    showScreen('edit-quiz');
+    const quizzes = getPublicQuizzes();
+    const quiz = quizzes.find(q => q.id === quizId);
+    if (quiz) {
+        document.getElementById('edit-quiz-title').value = quiz.title;
+        document.getElementById('edit-quiz-questions').value = quiz.questions;
+        document.getElementById('edit-quiz').dataset.quizId = quizId;
+        showScreen('edit-quiz');
+    }
 }
 
 function updateQuiz() {
-    const quizId = document.getElementById('edit-quiz-questions').dataset.quizId;
+    const quizId = document.getElementById('edit-quiz').dataset.quizId;
     const title = document.getElementById('edit-quiz-title').value;
     const questions = document.getElementById('edit-quiz-questions').value;
 
@@ -254,16 +305,48 @@ function updateQuiz() {
     const quizzes = getPublicQuizzes();
     const quizIndex = quizzes.findIndex(q => q.id === quizId);
     
-    if (quizIndex === -1) return;
+    if (quizIndex !== -1) {
+        quizzes[quizIndex] = {
+            ...quizzes[quizIndex],
+            title,
+            questions,
+            updatedAt: new Date().toISOString()
+        };
+        
+        localStorage.setItem('publicQuizzes', JSON.stringify(quizzes));
+        showPublicQuizzes();
+        alert('Questionário atualizado com sucesso!');
+    }
+}
 
-    quizzes[quizIndex] = {
-        ...quizzes[quizIndex],
-        title,
-        questions
-    };
+function loadPublicQuizzes() {
+    const quizzes = getPublicQuizzes();
+    const quizzesList = document.getElementById('quizzes-list');
+    quizzesList.innerHTML = '';
 
-    localStorage.setItem('publicQuizzes', JSON.stringify(quizzes));
-    showPublicQuizzes();
+    quizzes.forEach(quiz => {
+        const card = document.createElement('div');
+        card.className = 'quiz-card';
+        card.innerHTML = `
+            <h3>${quiz.title}</h3>
+            <p>Criado por: ${quiz.creator || 'Anônimo'}</p>
+            <p>Atualizado em: ${new Date(quiz.updatedAt).toLocaleDateString()}</p>
+            <div class="quiz-actions">
+                <button class="use-btn" onclick="useQuiz('${quiz.id}')">Usar</button>
+                <button class="edit-btn" onclick="editQuiz('${quiz.id}')">Editar</button>
+                <button class="delete-btn" onclick="deleteQuiz('${quiz.id}')">Excluir</button>
+            </div>
+        `;
+        quizzesList.appendChild(card);
+    });
+}
+
+function useQuiz(quizId) {
+    const quiz = getPublicQuizzes().find(q => q.id === quizId);
+    if (!quiz) return;
+
+    document.getElementById('create-questions').value = quiz.questions;
+    showCreateRoom();
 }
 
 function getUserId() {
@@ -282,61 +365,6 @@ function getPublicQuizzes() {
 function toggleExamples() {
     const panel = document.getElementById('examples-panel');
     panel.classList.toggle('hidden');
-}
-
-async function generateQuiz() {
-    const topic = document.getElementById('quiz-topic').value.trim();
-    if (!topic) {
-        alert('Por favor, digite um assunto para gerar o questionário');
-        return;
-    }
-
-    try {
-        // Encode the topic for URL
-        const encodedTopic = encodeURIComponent(topic);
-        
-        // Call Wit.ai API
-        const response = await fetch(`https://api.wit.ai/message?v=20241124&q=${encodedTopic}`, {
-            headers: {
-                'Authorization': 'Bearer 2FNM6QK5EPVUU65CZYV7GKXSJYHVJSZA'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error('Erro ao comunicar com a API');
-        }
-
-        const data = await response.json();
-        
-        // Process the response and format it into quiz questions
-        let questions = processWitResponse(data, topic);
-        
-        // Update the textarea with the generated questions
-        document.getElementById('quiz-questions').value = questions;
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Erro ao gerar o questionário. Por favor, tente novamente.');
-    }
-}
-
-function processWitResponse(data, topic) {
-    // This is a simple example of processing the Wit.ai response
-    // You can enhance this based on the actual response structure from Wit.ai
-    try {
-        // Generate some example questions based on the topic
-        // In a real implementation, you would use the Wit.ai response data
-        // to generate more relevant questions
-        const questions = [
-            `Qual é a principal característica de ${topic}?,Opção A,Opção B,$Opção C,Opção D;`,
-            `Qual é a importância de ${topic} no mundo moderno?,Baixa,Média,$Alta,Nenhuma;`,
-            `Como ${topic} afeta nossa vida diária?,Negativamente,Positivamente,$De várias formas,Não afeta;`
-        ];
-        
-        return questions.join('\n');
-    } catch (error) {
-        console.error('Error processing Wit.ai response:', error);
-        throw new Error('Erro ao processar a resposta da IA');
-    }
 }
 
 // Socket event handlers
