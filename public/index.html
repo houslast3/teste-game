@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Multiplayer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="initial-screen" class="screen">
+        <h1>Quiz Multiplayer</h1>
+        <div class="options">
+            <button onclick="showCreateRoom()">Criar Sala</button>
+            <button onclick="showJoinRoom()">Entrar em Sala</button>
+        </div>
+    </div>
+
+    <div id="create-room" class="screen hidden">
+        <h2>Criar Nova Sala</h2>
+        <input type="text" id="host-name" placeholder="Seu nome">
+        <textarea id="questions" placeholder="Digite as perguntas no formato: pergunta1,resposta1,resposta2,$resposta3,resposta4;"></textarea>
+        <button onclick="createRoom()">Criar Sala</button>
+        <button onclick="showInitialScreen()">Voltar</button>
+    </div>
+
+    <div id="join-room" class="screen hidden">
+        <h2>Entrar em Sala</h2>
+        <input type="text" id="player-name" placeholder="Seu nome">
+        <input type="text" id="room-code" placeholder="Código da sala (5 números)">
+        <button onclick="joinRoom()">Entrar</button>
+        <button onclick="showInitialScreen()">Voltar</button>
+    </div>
+
+    <div id="waiting-room" class="screen hidden">
+        <h2>Sala de Espera</h2>
+        <div id="room-code-display"></div>
+        <h3>Jogadores:</h3>
+        <ul id="players-list"></ul>
+        <div id="host-controls" class="hidden">
+            <button onclick="startGame()">Iniciar Jogo</button>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen hidden">
+        <div id="countdown" class="hidden"></div>
+        <div id="question-display"></div>
+        <div id="answers-grid" class="hidden">
+            <button class="answer-btn" id="answer-0" data-index="0"></button>
+            <button class="answer-btn" id="answer-1" data-index="1"></button>
+            <button class="answer-btn" id="answer-2" data-index="2"></button>
+            <button class="answer-btn" id="answer-3" data-index="3"></button>
+        </div>
+        <div id="result-display" class="hidden">
+            <h2>Resultado</h2>
+            <div id="correct-answer"></div>
+            <div id="scores"></div>
+        </div>
+        <div id="host-next" class="hidden">
+            <button onclick="nextQuestion()">Próxima Pergunta</button>
+        </div>
+    </div>
+
+    <div id="final-screen" class="screen hidden">
+        <h2>Fim de Jogo!</h2>
+        <div id="final-scores"></div>
+        <button onclick="showInitialScreen()">Voltar ao Início</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
