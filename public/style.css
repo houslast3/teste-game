@@ -14,8 +14,8 @@ body {
 }
 
 .screen {
-    width: 100%;
-    max-width: 800px;
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 20px;
     text-align: center;
 }
@@ -97,22 +97,28 @@ button:disabled {
 #answers-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr);
     gap: 10px;
-    height: 80vh;
-    padding: 10px;
+    margin: 20px auto;
+    max-width: 800px;
 }
 
 .answer-btn {
-    height: 100%;
-    font-size: 20px;
-    margin: 0;
-    border-radius: 15px;
+    padding: 15px;
+    font-size: 16px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s;
+    min-height: 100px;
     display: flex;
-    flex-direction: column;
-    justify-content: center;
     align-items: center;
-    overflow: hidden;
+    justify-content: center;
+    text-align: center;
+}
+
+.answer-btn:hover {
+    background: #f0f0f0;
 }
 
 .answer-btn img {
@@ -160,10 +166,10 @@ button:disabled {
 }
 
 #timer-display {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: bold;
-    color: #666;
-    margin-top: 10px;
+    margin: 10px 0;
+    color: #007bff;
 }
 
 #result-display {
@@ -213,41 +219,141 @@ button:disabled {
 
 #quizzes-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 15px;
-    padding: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
 }
 
 .quiz-card {
     background: white;
-    padding: 15px;
+    padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    cursor: pointer;
-    transition: transform 0.2s;
+    text-align: left;
 }
 
-.quiz-card:hover {
-    transform: translateY(-2px);
-}
-
-.quiz-card.own-quiz {
+.quiz-card.own {
     background: #e3f2fd;
 }
 
-.quiz-card .title {
-    font-size: 18px;
+.quiz-card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.quiz-card-actions button {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.edit-btn {
+    background: #ffc107;
+}
+
+.delete-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.play-btn {
+    background: #28a745;
+    color: white;
+}
+
+/* Estilo para containers de imagem */
+.image-container {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+.image-container img {
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+}
+
+/* Estilo para o formato visual de criação de questionários */
+.quiz-format-toggle {
+    margin: 20px 0;
+}
+
+.quiz-format-toggle button {
+    padding: 10px 20px;
+    margin: 0 5px;
+    border: 1px solid #ddd;
+    background: white;
+    cursor: pointer;
+}
+
+.quiz-format-toggle button.active {
+    background: #007bff;
+    color: white;
+}
+
+.quiz-format {
+    margin: 20px 0;
+}
+
+.question-form {
+    background: #f9f9f9;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin: 15px 0;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
     font-weight: bold;
-    margin-bottom: 10px;
 }
 
-.quiz-card .edit-btn {
-    background: #0074D9;
-    padding: 8px 16px;
-    font-size: 14px;
+.answer-input {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.answer-input input[type="text"] {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.answer-input input[type="radio"] {
+    margin: 0 5px;
+}
+
+.add-question-btn {
+    background: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 20px 0;
+}
+
+.delete-question {
+    background: #dc3545;
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
     margin-top: 10px;
-}
-
-.quiz-card .edit-btn:hover {
-    background: #0063b8;
 }

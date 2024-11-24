@@ -307,3 +307,256 @@ socket.on('hostLeft', () => {
 document.getElementById('quiz-search')?.addEventListener('input', (e) => {
     loadPublicQuizzes();
 });
+
+// Funções para manipulação do formato visual
+function toggleQuizFormat(format) {
+    document.querySelectorAll('.quiz-format-toggle button').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`button[onclick="toggleQuizFormat('${format}')"]`).classList.add('active');
+    
+    document.getElementById('text-format').classList.toggle('hidden', format !== 'text');
+    document.getElementById('form-format').classList.toggle('hidden', format !== 'form');
+}
+
+function addNewQuestion() {
+    const container = document.getElementById('questions-container');
+    const questionCount = container.children.length + 1;
+    if (questionCount > 100) {
+        alert('Limite máximo de 100 perguntas atingido!');
+        return;
+    }
+
+    const template = `
+        <div class="question-form" data-question="${questionCount}">
+            <h3>Pergunta ${questionCount}</h3>
+            <div class="form-group">
+                <label>Pergunta:</label>
+                <input type="text" class="question-text" placeholder="Digite a pergunta">
+                <input type="text" class="question-image" placeholder="URL da imagem (opcional)">
+            </div>
+            <div class="form-group">
+                <label>Respostas:</label>
+                <div class="answer-input">
+                    <input type="text" class="answer-text" placeholder="Resposta 1">
+                    <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
+                    <input type="radio" name="correct-${questionCount}" value="0"> Correta
+                </div>
+                <div class="answer-input">
+                    <input type="text" class="answer-text" placeholder="Resposta 2">
+                    <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
+                    <input type="radio" name="correct-${questionCount}" value="1"> Correta
+                </div>
+                <div class="answer-input">
+                    <input type="text" class="answer-text" placeholder="Resposta 3">
+                    <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
+                    <input type="radio" name="correct-${questionCount}" value="2"> Correta
+                </div>
+                <div class="answer-input">
+                    <input type="text" class="answer-text" placeholder="Resposta 4">
+                    <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
+                    <input type="radio" name="correct-${questionCount}" value="3"> Correta
+                </div>
+            </div>
+            <button class="delete-question" onclick="deleteQuestion(this)">Deletar Pergunta</button>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', template);
+}
+
+function deleteQuestion(button) {
+    const questionForm = button.closest('.question-form');
+    questionForm.remove();
+    renumberQuestions();
+}
+
+function renumberQuestions() {
+    const questions = document.querySelectorAll('.question-form');
+    questions.forEach((question, index) => {
+        const num = index + 1;
+        question.dataset.question = num;
+        question.querySelector('h3').textContent = `Pergunta ${num}`;
+        question.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.name = `correct-${num}`;
+        });
+    });
+}
+
+function convertFormToText() {
+    const questions = document.querySelectorAll('.question-form');
+    let textFormat = '';
+
+    questions.forEach((question, index) => {
+        const questionText = question.querySelector('.question-text').value;
+        const questionImage = question.querySelector('.question-image').value;
+        const answers = question.querySelectorAll('.answer-input');
+        const correctAnswer = question.querySelector('input[type="radio"]:checked').value;
+
+        let questionPart = questionText;
+        if (questionImage) {
+            questionPart += `[img:${questionImage}]`;
+        }
+
+        let answerParts = [];
+        answers.forEach((answer, answerIndex) => {
+            let answerText = answer.querySelector('.answer-text').value;
+            const answerImage = answer.querySelector('.answer-image').value;
+            
+            if (answerImage) {
+                answerText += `[img:${answerImage}]`;
+            }
+            
+            if (answerIndex == correctAnswer) {
+                answerText = '$' + answerText;
+            }
+            
+            answerParts.push(answerText);
+        });
+
+        textFormat += questionPart + ',' + answerParts.join(',');
+        if (index < questions.length - 1) {
+            textFormat += ';';
+        }
+    });
+
+    return textFormat;
+}
+
+function convertTextToForm(text) {
+    const questions = text.split(';');
+    document.getElementById('questions-container').innerHTML = '';
+
+    questions.forEach((question, index) => {
+        addNewQuestion();
+        const questionForm = document.querySelectorAll('.question-form')[index];
+        const parts = question.split(',');
+
+        // Parse question
+        const questionPart = parts[0];
+        const questionMatch = questionPart.match(/(.*?)(?:\[img:(.*?)\])?$/);
+        if (questionMatch) {
+            questionForm.querySelector('.question-text').value = questionMatch[1] || '';
+            questionForm.querySelector('.question-image').value = questionMatch[2] || '';
+        }
+
+        // Parse answers
+        parts.slice(1).forEach((answer, answerIndex) => {
+            const isCorrect = answer.startsWith('$');
+            const answerText = isCorrect ? answer.slice(1) : answer;
+            const answerMatch = answerText.match(/(.*?)(?:\[img:(.*?)\])?$/);
+            const answerInput = questionForm.querySelectorAll('.answer-input')[answerIndex];
+
+            if (answerMatch && answerInput) {
+                answerInput.querySelector('.answer-text').value = answerMatch[1] || '';
+                answerInput.querySelector('.answer-image').value = answerMatch[2] || '';
+                if (isCorrect) {
+                    answerInput.querySelector('input[type="radio"]').checked = true;
+                }
+            }
+        });
+    });
+}
+
+// Funções para manipulação de questionários públicos
+function savePublicQuiz() {
+    const title = document.getElementById('quiz-title').value;
+    if (!title) {
+        alert('Por favor, digite um título para o questionário');
+        return;
+    }
+
+    let questions;
+    if (document.getElementById('text-format').classList.contains('hidden')) {
+        // Formato visual
+        questions = convertFormToText();
+    } else {
+        // Formato texto
+        questions = document.getElementById('quiz-questions').value;
+    }
+
+    if (!questions) {
+        alert('Por favor, adicione algumas perguntas ao questionário');
+        return;
+    }
+
+    const quiz = {
+        id: Date.now().toString(),
+        title,
+        questions,
+        userId: getUserId()
+    };
+
+    const quizzes = getPublicQuizzes();
+    quizzes.push(quiz);
+    localStorage.setItem('publicQuizzes', JSON.stringify(quizzes));
+
+    showPublicQuizzes();
+}
+
+function editQuiz(quizId) {
+    const quiz = getPublicQuizzes().find(q => q.id === quizId);
+    if (!quiz) return;
+
+    document.getElementById('quiz-title').value = quiz.title;
+    document.getElementById('quiz-questions').value = quiz.questions;
+
+    // Preencher o formato visual também
+    convertTextToForm(quiz.questions);
+
+    showScreen('create-quiz');
+}
+
+function deleteQuiz(quizId) {
+    if (!confirm('Tem certeza que deseja deletar este questionário?')) return;
+
+    const quizzes = getPublicQuizzes().filter(q => q.id !== quizId);
+    localStorage.setItem('publicQuizzes', JSON.stringify(quizzes));
+    showPublicQuizzes();
+}
+
+function createRoomWithQuiz(quizId) {
+    const quiz = getPublicQuizzes().find(q => q.id === quizId);
+    if (!quiz) return;
+
+    document.getElementById('create-questions').value = quiz.questions;
+    showCreateRoom();
+}
+
+// Funções auxiliares
+function getUserId() {
+    let userId = localStorage.getItem('userId');
+    if (!userId) {
+        userId = 'user_' + Date.now();
+        localStorage.setItem('userId', userId);
+    }
+    return userId;
+}
+
+function getPublicQuizzes() {
+    return JSON.parse(localStorage.getItem('publicQuizzes') || '[]');
+}
+
+function renderPublicQuizzes() {
+    const quizzesList = document.getElementById('quizzes-list');
+    const userId = getUserId();
+    const quizzes = getPublicQuizzes();
+    const searchQuery = document.getElementById('quiz-search').value.toLowerCase();
+
+    const filteredQuizzes = searchQuery
+        ? quizzes.filter(quiz => quiz.title.toLowerCase().includes(searchQuery))
+        : quizzes;
+
+    quizzesList.innerHTML = filteredQuizzes.map(quiz => `
+        <div class="quiz-card ${quiz.userId === userId ? 'own' : ''}">
+            <h3>${quiz.title}</h3>
+            <div class="quiz-card-actions">
+                ${quiz.userId === userId ? `
+                    <button class="edit-btn" onclick="editQuiz('${quiz.id}')">Editar</button>
+                    <button class="delete-btn" onclick="deleteQuiz('${quiz.id}')">Deletar</button>
+                ` : ''}
+                <button class="play-btn" onclick="createRoomWithQuiz('${quiz.id}')">Jogar</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Event Listeners
+document.getElementById('quiz-search')?.addEventListener('input', renderPublicQuizzes);

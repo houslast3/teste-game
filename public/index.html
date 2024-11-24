@@ -29,9 +29,59 @@
     <div id="create-quiz" class="screen hidden">
         <h2>Criar Questionário Público</h2>
         <input type="text" id="quiz-title" placeholder="Título do questionário">
-        <textarea id="quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
-        <button onclick="savePublicQuiz()">Salvar Questionário</button>
-        <button onclick="showPublicQuizzes()">Voltar</button>
+        
+        <div class="quiz-format-toggle">
+            <button onclick="toggleQuizFormat('text')" class="active">Formato Texto</button>
+            <button onclick="toggleQuizFormat('form')">Formato Visual</button>
+        </div>
+
+        <div id="text-format" class="quiz-format">
+            <textarea id="quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
+        </div>
+
+        <div id="form-format" class="quiz-format hidden">
+            <div id="questions-container">
+                <!-- Template para uma pergunta -->
+                <div class="question-form" data-question="1">
+                    <h3>Pergunta 1</h3>
+                    <div class="form-group">
+                        <label>Pergunta:</label>
+                        <input type="text" class="question-text" placeholder="Digite a pergunta">
+                        <input type="text" class="question-image" placeholder="URL da imagem (opcional)">
+                    </div>
+                    <div class="form-group">
+                        <label>Respostas:</label>
+                        <div class="answer-input">
+                            <input type="text" class="answer-text" placeholder="Resposta 1">
+                            <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
+                            <input type="radio" name="correct-1" value="0"> Correta
+                        </div>
+                        <div class="answer-input">
+                            <input type="text" class="answer-text" placeholder="Resposta 2">
+                            <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
+                            <input type="radio" name="correct-1" value="1"> Correta
+                        </div>
+                        <div class="answer-input">
+                            <input type="text" class="answer-text" placeholder="Resposta 3">
+                            <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
+                            <input type="radio" name="correct-1" value="2"> Correta
+                        </div>
+                        <div class="answer-input">
+                            <input type="text" class="answer-text" placeholder="Resposta 4">
+                            <input type="text" class="answer-image" placeholder="URL da imagem (opcional)">
+                            <input type="radio" name="correct-1" value="3"> Correta
+                        </div>
+                    </div>
+                    <button class="delete-question" onclick="deleteQuestion(this)">Deletar Pergunta</button>
+                </div>
+            </div>
+            <button onclick="addNewQuestion()" class="add-question-btn">+ Adicionar Pergunta</button>
+        </div>
+
+        <div class="quiz-actions">
+            <button onclick="savePublicQuiz()">Salvar Questionário</button>
+            <button onclick="showPublicQuizzes()">Voltar</button>
+        </div>
     </div>
 
     <div id="edit-quiz" class="screen hidden">
@@ -73,22 +123,22 @@
     <div id="game-screen" class="screen hidden">
         <div id="countdown" class="hidden"></div>
         <div id="question-container">
-            <div id="question-display"></div>
+            <div id="question-display" class="image-container"></div>
             <div id="timer-display"></div>
         </div>
         <div id="answers-grid" class="hidden">
-            <button class="answer-btn" id="answer-0" data-index="0"></button>
-            <button class="answer-btn" id="answer-1" data-index="1"></button>
-            <button class="answer-btn" id="answer-2" data-index="2"></button>
-            <button class="answer-btn" id="answer-3" data-index="3"></button>
+            <button class="answer-btn image-container" id="answer-0" data-index="0"></button>
+            <button class="answer-btn image-container" id="answer-1" data-index="1"></button>
+            <button class="answer-btn image-container" id="answer-2" data-index="2"></button>
+            <button class="answer-btn image-container" id="answer-3" data-index="3"></button>
         </div>
         <div id="result-display" class="hidden">
             <h2>Resultado</h2>
             <div id="correct-answer"></div>
             <div id="scores"></div>
-            <div id="host-next" class="hidden">
-                <button onclick="nextQuestion()">Próxima Pergunta</button>
-            </div>
+        </div>
+        <div id="host-next" class="hidden">
+            <button onclick="nextQuestion()">Próxima Pergunta</button>
         </div>
     </div>
 
