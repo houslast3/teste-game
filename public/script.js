@@ -46,6 +46,7 @@ function resetGame() {
 function createRoom() {
     const questions = document.getElementById('create-questions').value;
     const timePerQ = document.getElementById('time-per-question').value;
+    const hostName = document.getElementById('host-name').value;
     
     if (!questions) {
         alert('Por favor, adicione algumas perguntas');
@@ -57,15 +58,14 @@ function createRoom() {
         return;
     }
 
-    const playerName = document.getElementById('player-name').value;
-    if (!playerName) {
+    if (!hostName) {
         alert('Por favor, digite seu nome');
         return;
     }
 
     isHost = true;
     timePerQuestion = parseInt(timePerQ);
-    socket.emit('createRoom', { playerName, questions, timePerQuestion });
+    socket.emit('createRoom', { playerName: hostName, questions, timePerQuestion });
 }
 
 function joinRoom() {
@@ -180,29 +180,6 @@ function showFinalScores(scores) {
         ).join('<br>');
 }
 
-function savePublicQuiz() {
-    const title = document.getElementById('quiz-title').value;
-    const questions = document.getElementById('quiz-questions').value;
-
-    if (!title || !questions) {
-        alert('Por favor, preencha todos os campos');
-        return;
-    }
-
-    const quiz = {
-        id: Date.now().toString(),
-        title,
-        questions,
-        userId: getUserId()
-    };
-
-    const quizzes = getPublicQuizzes();
-    quizzes.push(quiz);
-    localStorage.setItem('publicQuizzes', JSON.stringify(quizzes));
-
-    showPublicQuizzes();
-}
-
 async function generateQuiz() {
     const topic = document.getElementById('quiz-topic').value.trim();
     if (!topic) {
@@ -211,47 +188,26 @@ async function generateQuiz() {
     }
 
     try {
-        const encodedTopic = encodeURIComponent(topic);
-        const prompt = `Gere 5 perguntas de múltipla escolha sobre ${topic}. Cada pergunta deve ter 4 alternativas, sendo uma correta marcada com $. Use o formato: pergunta,resposta1,resposta2,$respostacorreta,resposta4;`;
-        
-        // First API call to get the message ID
-        const messageResponse = await fetch(`https://api.wit.ai/message?v=20241124&q=${encodedTopic}`, {
+        const encodedTopic = encodeURIComponent(`Gere 5 perguntas de múltipla escolha sobre ${topic}. Use o formato: pergunta,resposta1,resposta2,$respostacorreta,resposta4;`);
+        const response = await fetch(`https://api.wit.ai/message?v=20241124&q=${encodedTopic}`, {
+            method: 'GET',
             headers: {
                 'Authorization': 'Bearer 2FNM6QK5EPVUU65CZYV7GKXSJYHVJSZA'
             }
         });
 
-        if (!messageResponse.ok) {
+        if (!response.ok) {
             throw new Error('Erro ao comunicar com a API do Wit.ai');
         }
 
-        const messageData = await messageResponse.json();
+        const data = await response.json();
+        console.log('Wit.ai response:', data);
 
-        // Second API call to generate the quiz content
-        const generateResponse = await fetch('https://api.wit.ai/utterances', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer Q2DZJA5MB7VYI7PLOEG6GWWQFBQAGLUI',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify([{
-                text: prompt,
-                intent: 'generate_quiz',
-                entities: [
-                    {
-                        entity: 'topic',
-                        value: topic
-                    }
-                ]
-            }])
-        });
-
-        if (!generateResponse.ok) {
-            throw new Error('Erro ao gerar questionário');
-        }
-
-        const quizData = await generateResponse.json();
-        const questions = processWitResponse(quizData, topic);
+        // Get the generated text from the response
+        const generatedText = data.text || '';
+        
+        // Process the response into quiz format
+        const questions = processWitResponse(generatedText, topic);
         document.getElementById('quiz-questions').value = questions;
     } catch (error) {
         console.error('Error:', error);
@@ -259,8 +215,13 @@ async function generateQuiz() {
     }
 }
 
-function processWitResponse(data, topic) {
-    // Format questions based on the topic
+function processWitResponse(text, topic) {
+    // If we got a proper response from Wit.ai, use it
+    if (text && text.includes('?')) {
+        return text;
+    }
+
+    // Fallback questions if the API response isn't in the expected format
     const questions = [
         `Qual é o principal conceito de ${topic}?,Conceito básico,Conceito intermediário,$Conceito avançado,Nenhum dos anteriores;`,
         `Qual é a aplicação mais comum de ${topic}?,Uso pessoal,Uso comercial,$Uso profissional,Uso educacional;`,
@@ -270,6 +231,55 @@ function processWitResponse(data, topic) {
     ];
     
     return questions.join('\n');
+}
+
+function savePublicQuiz() {
+    const title = document.getElementById('quiz-title').value;
+    const questions = document.getElementById('quiz-questions').value;
+    const creatorName = document.getElementById('quiz-creator-name').value;
+
+    if (!title || !questions || !creatorName) {
+        alert('Por favor, preencha todos os campos (nome, título e perguntas)');
+        return;
+    }
+
+    const quizzes = getPublicQuizzes();
+    const newQuiz = {
+        id: Date.now().toString(),
+        title,
+        questions,
+        creator: creatorName,
+        userId: getUserId(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+
+    quizzes.push(newQuiz);
+    localStorage.setItem('publicQuizzes', JSON.stringify(quizzes));
+    showPublicQuizzes();
+    alert('Questionário salvo com sucesso!');
+}
+
+function loadPublicQuizzes() {
+    const quizzes = getPublicQuizzes();
+    const quizzesList = document.getElementById('quizzes-list');
+    quizzesList.innerHTML = '';
+
+    quizzes.forEach(quiz => {
+        const card = document.createElement('div');
+        card.className = 'quiz-card';
+        card.innerHTML = `
+            <h3>${quiz.title}</h3>
+            <p>Criado por: ${quiz.creator || 'Anônimo'}</p>
+            <p>Atualizado em: ${new Date(quiz.updatedAt).toLocaleDateString()}</p>
+            <div class="quiz-actions">
+                <button class="use-btn" onclick="useQuiz('${quiz.id}')">Usar</button>
+                <button class="edit-btn" onclick="editQuiz('${quiz.id}')">Editar</button>
+                <button class="delete-btn" onclick="deleteQuiz('${quiz.id}')">Excluir</button>
+            </div>
+        `;
+        quizzesList.appendChild(card);
+    });
 }
 
 function deleteQuiz(quizId) {
@@ -317,28 +327,6 @@ function updateQuiz() {
         showPublicQuizzes();
         alert('Questionário atualizado com sucesso!');
     }
-}
-
-function loadPublicQuizzes() {
-    const quizzes = getPublicQuizzes();
-    const quizzesList = document.getElementById('quizzes-list');
-    quizzesList.innerHTML = '';
-
-    quizzes.forEach(quiz => {
-        const card = document.createElement('div');
-        card.className = 'quiz-card';
-        card.innerHTML = `
-            <h3>${quiz.title}</h3>
-            <p>Criado por: ${quiz.creator || 'Anônimo'}</p>
-            <p>Atualizado em: ${new Date(quiz.updatedAt).toLocaleDateString()}</p>
-            <div class="quiz-actions">
-                <button class="use-btn" onclick="useQuiz('${quiz.id}')">Usar</button>
-                <button class="edit-btn" onclick="editQuiz('${quiz.id}')">Editar</button>
-                <button class="delete-btn" onclick="deleteQuiz('${quiz.id}')">Excluir</button>
-            </div>
-        `;
-        quizzesList.appendChild(card);
-    });
 }
 
 function useQuiz(quizId) {
