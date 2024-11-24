@@ -16,27 +16,23 @@
         </div>
     </div>
 
+    <div id="public-quizzes" class="screen hidden">
+        <h2>Questionários Públicos</h2>
+        <div class="search-bar">
+            <input type="text" id="quiz-search" placeholder="Pesquisar questionários...">
+        </div>
+        <div class="quiz-buttons">
+            <button class="add-quiz-btn" onclick="showCreateQuiz()">+ Novo Questionário</button>
+            <button class="generate-quiz-btn" onclick="showGenerateQuiz()">Gerar Questionário com IA</button>
+        </div>
+        <div id="quizzes-list"></div>
+        <button onclick="showInitialScreen()">Voltar</button>
+    </div>
+
     <div id="create-quiz" class="screen hidden">
         <h2>Criar Questionário Público</h2>
-        <input type="text" id="quiz-creator-name" placeholder="Seu nome">
         <input type="text" id="quiz-title" placeholder="Título do questionário">
-        <input type="text" id="quiz-topic" placeholder="Digite o assunto do questionário para gerar automaticamente">
-        <div class="quiz-input-container">
-            <textarea id="quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
-            <button id="examples-btn" onclick="toggleExamples()">Exemplos</button>
-        </div>
-        <div id="examples-panel" class="hidden">
-            <h3>Exemplos de Formato:</h3>
-            <div class="example">
-                <h4>Texto Simples:</h4>
-                <pre>Qual é a capital do Brasil?,Rio de Janeiro,São Paulo,$Brasília,Salvador;</pre>
-            </div>
-            <div class="example">
-                <h4>Com Imagens:</h4>
-                <pre>Que animal é este?[img:https://exemplo.com/leao.jpg],Tigre,Leopardo,$Leão,Guepardo;</pre>
-            </div>
-        </div>
-        <button onclick="generateQuiz()">Gerar com IA</button>
+        <textarea id="quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
         <button onclick="savePublicQuiz()">Salvar Questionário</button>
         <button onclick="showPublicQuizzes()">Voltar</button>
     </div>
@@ -44,45 +40,48 @@
     <div id="edit-quiz" class="screen hidden">
         <h2>Editar Questionário</h2>
         <input type="text" id="edit-quiz-title" placeholder="Título do questionário">
-        <textarea id="edit-quiz-questions"></textarea>
-        <button onclick="updateQuiz()">Salvar Alterações</button>
+        <textarea id="edit-quiz-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
+        <button onclick="updatePublicQuiz()">Atualizar Questionário</button>
         <button onclick="showPublicQuizzes()">Voltar</button>
     </div>
 
-    <div id="public-quizzes" class="screen hidden">
-        <h2>Questionários Públicos</h2>
-        <div class="search-bar">
-            <input type="text" id="quiz-search" placeholder="Pesquisar questionários...">
+    <div id="generate-quiz" class="screen hidden">
+        <h2>Gerar Questionário com IA</h2>
+        <div class="form-group">
+            <label for="quiz-subject">Assunto do Questionário:</label>
+            <input type="text" id="quiz-subject" placeholder="Ex: História do Brasil, Matemática Básica, etc">
         </div>
-        <button class="add-quiz-btn" onclick="showCreateQuiz()">+ Novo Questionário</button>
-        <div id="quizzes-list"></div>
-        <button onclick="showInitialScreen()">Voltar</button>
+        <button onclick="generateQuiz()">Gerar Questionário</button>
+        <div id="generated-quiz" class="hidden">
+            <h3>Questionário Gerado:</h3>
+            <textarea id="generated-questions" readonly></textarea>
+            <button onclick="saveGeneratedQuiz()">Salvar Questionário</button>
+        </div>
+        <button onclick="showPublicQuizzes()">Voltar</button>
     </div>
 
     <div id="create-room" class="screen hidden">
-        <h2>Criar Sala</h2>
-        <div class="room-options">
-            <input type="text" id="host-name" placeholder="Seu nome">
-            <label for="time-per-question">Tempo por pergunta (segundos):</label>
-            <input type="number" id="time-per-question" min="10" max="120" value="30">
-            <textarea id="create-questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
-        </div>
+        <h2>Criar Nova Sala</h2>
+        <input type="text" id="host-name" placeholder="Seu nome">
+        <input type="number" id="time-per-question" placeholder="Tempo por pergunta (segundos)" value="30" min="10" max="120">
+        <textarea id="questions" placeholder="Digite as perguntas no formato: pergunta1[img:url],resposta1[img:url],resposta2,$resposta3,resposta4;"></textarea>
         <button onclick="createRoom()">Criar Sala</button>
         <button onclick="showInitialScreen()">Voltar</button>
     </div>
 
     <div id="join-room" class="screen hidden">
         <h2>Entrar em Sala</h2>
-        <input type="text" id="room-code" placeholder="Código da sala">
         <input type="text" id="player-name" placeholder="Seu nome">
+        <input type="text" id="room-code" placeholder="Código da sala (5 números)">
         <button onclick="joinRoom()">Entrar</button>
         <button onclick="showInitialScreen()">Voltar</button>
     </div>
 
     <div id="waiting-room" class="screen hidden">
         <h2>Sala de Espera</h2>
-        <div id="room-info"></div>
-        <div id="players-list"></div>
+        <div id="room-code-display"></div>
+        <h3>Jogadores:</h3>
+        <ul id="players-list"></ul>
         <div id="host-controls" class="hidden">
             <button onclick="startGame()">Iniciar Jogo</button>
         </div>

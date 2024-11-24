@@ -3,6 +3,13 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const path = require('path');
+const { Configuration, OpenAIApi } = require('openai');
+
+// OpenAI configuration
+const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY
+});
+const openai = new OpenAIApi(configuration);
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -50,6 +57,46 @@ app.put('/api/quizzes/:id', (req, res) => {
         }
     } else {
         res.status(404).json({ error: 'Questionário não encontrado' });
+    }
+});
+
+app.delete('/api/quizzes/:id', (req, res) => {
+    const { id } = req.params;
+    const { userId } = req.body;
+    
+    if (publicQuizzes.has(id)) {
+        const quiz = publicQuizzes.get(id);
+        if (quiz.userId === userId) {
+            publicQuizzes.delete(id);
+            res.json({ success: true });
+        } else {
+            res.status(403).json({ error: 'Não autorizado' });
+        }
+    } else {
+        res.status(404).json({ error: 'Questionário não encontrado' });
+    }
+});
+
+app.post('/api/generate-quiz', async (req, res) => {
+    try {
+        const { subject } = req.body;
+        
+        const prompt = `Crie um quiz com 5 perguntas sobre ${subject}. 
+        Formato: pergunta1,resposta1,resposta2,$resposta3,resposta4;pergunta2,resposta1,$resposta2,resposta3,resposta4
+        O $ indica a resposta correta. Não inclua números nas perguntas.`;
+
+        const completion = await openai.createCompletion({
+            model: "text-davinci-003",
+            prompt: prompt,
+            max_tokens: 1000,
+            temperature: 0.7,
+        });
+
+        const generatedQuiz = completion.data.choices[0].text.trim();
+        res.json({ questions: generatedQuiz });
+    } catch (error) {
+        console.error('Erro ao gerar quiz:', error);
+        res.status(500).json({ error: 'Erro ao gerar quiz' });
     }
 });
 

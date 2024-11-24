@@ -1,20 +1,20 @@
-let socket = io();
-let currentScreen = 'initial-screen';
-let isHost = false;
-let selectedAnswer = null;
-let currentQuestion = null;
-let timePerQuestion = 30;
-let countdown;
+const socket = io();
 
+let currentRoom = null;
+let isHost = false;
+let userId = localStorage.getItem('userId') || Date.now().toString(36);
+let currentQuizId = null;
+
+localStorage.setItem('userId', userId);
+
+// Funções de navegação entre telas
 function showScreen(screenId) {
-    document.getElementById(currentScreen).classList.add('hidden');
+    document.querySelectorAll('.screen').forEach(screen => screen.classList.add('hidden'));
     document.getElementById(screenId).classList.remove('hidden');
-    currentScreen = screenId;
 }
 
 function showInitialScreen() {
     showScreen('initial-screen');
-    resetGame();
 }
 
 function showCreateRoom() {
@@ -34,45 +34,172 @@ function showCreateQuiz() {
     showScreen('create-quiz');
 }
 
-function resetGame() {
-    isHost = false;
-    selectedAnswer = null;
-    currentQuestion = null;
-    if (countdown) {
-        clearInterval(countdown);
+function showGenerateQuiz() {
+    showScreen('generate-quiz');
+    document.getElementById('generated-quiz').classList.add('hidden');
+    document.getElementById('quiz-subject').value = '';
+    document.getElementById('generated-questions').value = '';
+}
+
+// Funções para questionários públicos
+async function loadPublicQuizzes() {
+    const searchTerm = document.getElementById('quiz-search')?.value || '';
+    const response = await fetch(`/api/quizzes?search=${encodeURIComponent(searchTerm)}`);
+    const quizzes = await response.json();
+    
+    const quizzesList = document.getElementById('quizzes-list');
+    quizzesList.innerHTML = '';
+    
+    quizzes.forEach(quiz => {
+        const card = document.createElement('div');
+        card.className = `quiz-card ${quiz.userId === userId ? 'own-quiz' : ''}`;
+        
+        const buttons = quiz.userId === userId ? `
+            <div class="quiz-actions">
+                <button class="edit-btn" onclick="editQuiz('${quiz.id}')">Editar</button>
+                <button class="delete-btn" onclick="deleteQuiz('${quiz.id}')">Excluir</button>
+            </div>
+        ` : `
+            <div class="quiz-actions">
+                <button class="use-btn" onclick="usePublicQuiz('${quiz.id}')">Usar</button>
+            </div>
+        `;
+        
+        card.innerHTML = `
+            <div class="title">${quiz.title}</div>
+            ${buttons}
+        `;
+        
+        quizzesList.appendChild(card);
+    });
+}
+
+async function savePublicQuiz() {
+    const title = document.getElementById('quiz-title').value.trim();
+    const questions = document.getElementById('quiz-questions').value.trim();
+    
+    if (!title || !questions) {
+        alert('Por favor, preencha todos os campos');
+        return;
+    }
+    
+    const response = await fetch('/api/quizzes', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            title,
+            questions,
+            userId
+        })
+    });
+    
+    if (response.ok) {
+        showPublicQuizzes();
     }
 }
 
-function createRoom() {
-    const questions = document.getElementById('create-questions').value;
-    const timePerQ = document.getElementById('time-per-question').value;
-    const hostName = document.getElementById('host-name').value;
+async function saveGeneratedQuiz() {
+    const questions = document.getElementById('generated-questions').value.trim();
+    const subject = document.getElementById('quiz-subject').value.trim();
     
-    if (!questions) {
-        alert('Por favor, adicione algumas perguntas');
+    if (!questions || !subject) {
+        alert('Erro ao salvar questionário');
+        return;
+    }
+    
+    await savePublicQuiz({
+        title: `Quiz sobre ${subject}`,
+        questions: questions
+    });
+}
+
+async function editQuiz(quizId) {
+    const response = await fetch(`/api/quizzes/${quizId}`);
+    const quiz = await response.json();
+    
+    document.getElementById('edit-quiz-title').value = quiz.title;
+    document.getElementById('edit-quiz-questions').value = quiz.questions;
+    currentQuizId = quizId;
+    
+    showScreen('edit-quiz');
+}
+
+async function updatePublicQuiz() {
+    const title = document.getElementById('edit-quiz-title').value.trim();
+    const questions = document.getElementById('edit-quiz-questions').value.trim();
+    
+    if (!title || !questions) {
+        alert('Por favor, preencha todos os campos');
+        return;
+    }
+    
+    const response = await fetch(`/api/quizzes/${currentQuizId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            title,
+            questions,
+            userId
+        })
+    });
+    
+    if (response.ok) {
+        showPublicQuizzes();
+    }
+}
+
+async function deleteQuiz(quizId) {
+    if (!confirm('Tem certeza que deseja excluir este questionário?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/quizzes/${quizId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ userId })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao excluir questionário');
+        }
+        
+        loadPublicQuizzes();
+    } catch (error) {
+        alert('Erro ao excluir questionário');
+    }
+}
+
+function usePublicQuiz(quiz) {
+    document.getElementById('questions').value = quiz.questions;
+    showCreateRoom();
+}
+
+// Funções de criação e entrada em sala
+function createRoom() {
+    const hostName = document.getElementById('host-name').value.trim();
+    const questions = document.getElementById('questions').value.trim();
+    const timePerQuestion = parseInt(document.getElementById('time-per-question').value) || 30;
+    
+    if (!hostName || !questions) {
+        alert('Por favor, preencha todos os campos');
         return;
     }
 
-    if (timePerQ < 10 || timePerQ > 120) {
-        alert('O tempo por pergunta deve estar entre 10 e 120 segundos');
-        return;
-    }
-
-    if (!hostName) {
-        alert('Por favor, digite seu nome');
-        return;
-    }
-
-    isHost = true;
-    timePerQuestion = parseInt(timePerQ);
-    socket.emit('createRoom', { playerName: hostName, questions, timePerQuestion });
+    socket.emit('createRoom', { hostName, questions, timePerQuestion });
 }
 
 function joinRoom() {
-    const roomCode = document.getElementById('room-code').value;
-    const playerName = document.getElementById('player-name').value;
-
-    if (!roomCode || !playerName) {
+    const playerName = document.getElementById('player-name').value.trim();
+    const roomCode = document.getElementById('room-code').value.trim();
+    
+    if (!playerName || !roomCode) {
         alert('Por favor, preencha todos os campos');
         return;
     }
@@ -81,356 +208,188 @@ function joinRoom() {
 }
 
 function leaveRoom() {
-    socket.emit('leaveRoom');
-    showInitialScreen();
+    if (currentRoom) {
+        socket.emit('leaveRoom', currentRoom);
+        showInitialScreen();
+    }
 }
 
+// Funções do jogo
 function startGame() {
-    socket.emit('startGame');
+    socket.emit('startGame', currentRoom);
 }
 
-function selectAnswer(index) {
-    if (selectedAnswer !== null) return;
-    selectedAnswer = index;
+function submitAnswer(answerIndex) {
+    socket.emit('submitAnswer', { roomCode: currentRoom, answerIndex });
     document.querySelectorAll('.answer-btn').forEach(btn => {
-        btn.classList.remove('selected');
-        if (parseInt(btn.dataset.index) === index) {
-            btn.classList.add('selected');
-        }
+        btn.disabled = true;
     });
-    socket.emit('submitAnswer', index);
 }
 
 function nextQuestion() {
-    socket.emit('nextQuestion');
+    socket.emit('nextQuestion', currentRoom);
 }
 
-function showQuestion(question) {
-    currentQuestion = question;
-    selectedAnswer = null;
-    document.getElementById('countdown').classList.add('hidden');
-    
-    const questionDisplay = document.getElementById('question-display');
-    const answersGrid = document.getElementById('answers-grid');
-    const resultDisplay = document.getElementById('result-display');
-    
-    questionDisplay.innerHTML = formatContent(question.question);
-    
-    for (let i = 0; i < 4; i++) {
-        const button = document.getElementById(`answer-${i}`);
-        button.innerHTML = formatContent(question.answers[i]);
-        button.classList.remove('selected', 'correct', 'incorrect');
-        button.disabled = false;
-    }
-    
-    answersGrid.classList.remove('hidden');
-    resultDisplay.classList.add('hidden');
-    
-    if (isHost) {
-        document.getElementById('host-next').classList.add('hidden');
-    }
-}
-
-function formatContent(content) {
-    if (!content) return '';
+// Funções auxiliares
+function parseContent(content) {
     const imgMatch = content.match(/\[img:(.*?)\]/);
     if (imgMatch) {
-        const text = content.replace(/\[img:.*?\]/, '').trim();
         const imgUrl = imgMatch[1];
-        return `${text}<br><img src="${imgUrl}" alt="Question Image">`;
+        const text = content.replace(/\[img:.*?\]/, '').trim();
+        return {
+            text,
+            imgUrl
+        };
     }
-    return content;
-}
-
-function showResult(result) {
-    const answersGrid = document.getElementById('answers-grid');
-    const resultDisplay = document.getElementById('result-display');
-    
-    document.querySelectorAll('.answer-btn').forEach(btn => {
-        btn.disabled = true;
-        const index = parseInt(btn.dataset.index);
-        if (index === result.correctAnswer) {
-            btn.classList.add('correct');
-        } else if (index === selectedAnswer && selectedAnswer !== result.correctAnswer) {
-            btn.classList.add('incorrect');
-        }
-    });
-
-    document.getElementById('correct-answer').innerHTML = `Resposta correta: ${currentQuestion.answers[result.correctAnswer]}`;
-    document.getElementById('scores').innerHTML = Object.entries(result.scores)
-        .map(([player, score]) => `${player}: ${score}`)
-        .join('<br>');
-
-    resultDisplay.classList.remove('hidden');
-    
-    if (isHost) {
-        document.getElementById('host-next').classList.remove('hidden');
-    }
-}
-
-function showFinalScores(scores) {
-    showScreen('final-screen');
-    const sortedScores = Object.entries(scores)
-        .sort(([,a], [,b]) => b - a);
-    
-    document.getElementById('final-scores').innerHTML = 
-        `<h3>Ranking Final</h3>` +
-        sortedScores.map(([player, score], index) => 
-            `${index + 1}. ${player}: ${score}`
-        ).join('<br>');
+    return {
+        text: content,
+        imgUrl: null
+    };
 }
 
 async function generateQuiz() {
-    const topic = document.getElementById('quiz-topic').value.trim();
-    if (!topic) {
-        alert('Por favor, digite um assunto para gerar o questionário');
+    const subject = document.getElementById('quiz-subject').value.trim();
+    if (!subject) {
+        alert('Por favor, digite o assunto do questionário');
         return;
     }
 
+    const generateButton = document.querySelector('#generate-quiz button');
+    generateButton.disabled = true;
+    generateButton.textContent = 'Gerando...';
+
     try {
-        const encodedTopic = encodeURIComponent(`Gere 5 perguntas de múltipla escolha sobre ${topic}. Use o formato: pergunta,resposta1,resposta2,$respostacorreta,resposta4;`);
-        const response = await fetch(`https://api.wit.ai/message?v=20241124&q=${encodedTopic}`, {
-            method: 'GET',
+        const response = await fetch('/api/generate-quiz', {
+            method: 'POST',
             headers: {
-                'Authorization': 'Bearer 2FNM6QK5EPVUU65CZYV7GKXSJYHVJSZA'
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ subject })
         });
 
         if (!response.ok) {
-            throw new Error('Erro ao comunicar com a API do Wit.ai');
+            throw new Error('Erro ao gerar questionário');
         }
 
         const data = await response.json();
-        console.log('Wit.ai response:', data);
-
-        // Get the generated text from the response
-        const generatedText = data.text || '';
-        
-        // Process the response into quiz format
-        const questions = processWitResponse(generatedText, topic);
-        document.getElementById('quiz-questions').value = questions;
+        document.getElementById('generated-questions').value = data.questions;
+        document.getElementById('generated-quiz').classList.remove('hidden');
     } catch (error) {
-        console.error('Error:', error);
-        alert('Erro ao gerar o questionário. Por favor, tente novamente.');
+        alert('Erro ao gerar questionário. Por favor, tente novamente.');
+    } finally {
+        generateButton.disabled = false;
+        generateButton.textContent = 'Gerar Questionário';
     }
 }
 
-function processWitResponse(text, topic) {
-    // If we got a proper response from Wit.ai, use it
-    if (text && text.includes('?')) {
-        return text;
+// Socket event listeners
+socket.on('roomCreated', ({ roomCode, isHost: host }) => {
+    currentRoom = roomCode;
+    isHost = host;
+    document.getElementById('room-code-display').textContent = `Código da sala: ${roomCode}`;
+    if (isHost) {
+        document.getElementById('host-controls').classList.remove('hidden');
     }
-
-    // Fallback questions if the API response isn't in the expected format
-    const questions = [
-        `Qual é o principal conceito de ${topic}?,Conceito básico,Conceito intermediário,$Conceito avançado,Nenhum dos anteriores;`,
-        `Qual é a aplicação mais comum de ${topic}?,Uso pessoal,Uso comercial,$Uso profissional,Uso educacional;`,
-        `Como ${topic} impacta a sociedade moderna?,Baixo impacto,Médio impacto,$Alto impacto,Nenhum impacto;`,
-        `Qual é a tendência futura para ${topic}?,Diminuição,Estagnação,$Crescimento,Obsolescência;`,
-        `Quem são os principais beneficiados por ${topic}?,Empresas,Governos,$Sociedade em geral,Indivíduos específicos;`
-    ];
-    
-    return questions.join('\n');
-}
-
-function savePublicQuiz() {
-    const title = document.getElementById('quiz-title').value;
-    const questions = document.getElementById('quiz-questions').value;
-    const creatorName = document.getElementById('quiz-creator-name').value;
-
-    if (!title || !questions || !creatorName) {
-        alert('Por favor, preencha todos os campos (nome, título e perguntas)');
-        return;
-    }
-
-    const quizzes = getPublicQuizzes();
-    const newQuiz = {
-        id: Date.now().toString(),
-        title,
-        questions,
-        creator: creatorName,
-        userId: getUserId(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-
-    quizzes.push(newQuiz);
-    localStorage.setItem('publicQuizzes', JSON.stringify(quizzes));
-    showPublicQuizzes();
-    alert('Questionário salvo com sucesso!');
-}
-
-function loadPublicQuizzes() {
-    const quizzes = getPublicQuizzes();
-    const quizzesList = document.getElementById('quizzes-list');
-    quizzesList.innerHTML = '';
-
-    quizzes.forEach(quiz => {
-        const card = document.createElement('div');
-        card.className = 'quiz-card';
-        card.innerHTML = `
-            <h3>${quiz.title}</h3>
-            <p>Criado por: ${quiz.creator || 'Anônimo'}</p>
-            <p>Atualizado em: ${new Date(quiz.updatedAt).toLocaleDateString()}</p>
-            <div class="quiz-actions">
-                <button class="use-btn" onclick="useQuiz('${quiz.id}')">Usar</button>
-                <button class="edit-btn" onclick="editQuiz('${quiz.id}')">Editar</button>
-                <button class="delete-btn" onclick="deleteQuiz('${quiz.id}')">Excluir</button>
-            </div>
-        `;
-        quizzesList.appendChild(card);
-    });
-}
-
-function deleteQuiz(quizId) {
-    if (confirm('Tem certeza que deseja excluir este questionário?')) {
-        const quizzes = getPublicQuizzes();
-        const updatedQuizzes = quizzes.filter(quiz => quiz.id !== quizId);
-        localStorage.setItem('publicQuizzes', JSON.stringify(updatedQuizzes));
-        loadPublicQuizzes();
-    }
-}
-
-function editQuiz(quizId) {
-    const quizzes = getPublicQuizzes();
-    const quiz = quizzes.find(q => q.id === quizId);
-    if (quiz) {
-        document.getElementById('edit-quiz-title').value = quiz.title;
-        document.getElementById('edit-quiz-questions').value = quiz.questions;
-        document.getElementById('edit-quiz').dataset.quizId = quizId;
-        showScreen('edit-quiz');
-    }
-}
-
-function updateQuiz() {
-    const quizId = document.getElementById('edit-quiz').dataset.quizId;
-    const title = document.getElementById('edit-quiz-title').value;
-    const questions = document.getElementById('edit-quiz-questions').value;
-
-    if (!title || !questions) {
-        alert('Por favor, preencha todos os campos');
-        return;
-    }
-
-    const quizzes = getPublicQuizzes();
-    const quizIndex = quizzes.findIndex(q => q.id === quizId);
-    
-    if (quizIndex !== -1) {
-        quizzes[quizIndex] = {
-            ...quizzes[quizIndex],
-            title,
-            questions,
-            updatedAt: new Date().toISOString()
-        };
-        
-        localStorage.setItem('publicQuizzes', JSON.stringify(quizzes));
-        showPublicQuizzes();
-        alert('Questionário atualizado com sucesso!');
-    }
-}
-
-function useQuiz(quizId) {
-    const quiz = getPublicQuizzes().find(q => q.id === quizId);
-    if (!quiz) return;
-
-    document.getElementById('create-questions').value = quiz.questions;
-    showCreateRoom();
-}
-
-function getUserId() {
-    let userId = localStorage.getItem('userId');
-    if (!userId) {
-        userId = 'user_' + Date.now();
-        localStorage.setItem('userId', userId);
-    }
-    return userId;
-}
-
-function getPublicQuizzes() {
-    return JSON.parse(localStorage.getItem('publicQuizzes') || '[]');
-}
-
-function toggleExamples() {
-    const panel = document.getElementById('examples-panel');
-    panel.classList.toggle('hidden');
-}
-
-// Socket event handlers
-socket.on('roomCreated', (roomCode) => {
-    document.getElementById('room-info').textContent = `Código da sala: ${roomCode}`;
     showScreen('waiting-room');
-    document.getElementById('host-controls').classList.remove('hidden');
 });
 
-socket.on('roomJoined', () => {
+socket.on('roomJoined', ({ roomCode, isHost: host }) => {
+    currentRoom = roomCode;
+    isHost = host;
+    document.getElementById('room-code-display').textContent = `Código da sala: ${roomCode}`;
     showScreen('waiting-room');
-    document.getElementById('host-controls').classList.add('hidden');
 });
 
 socket.on('updatePlayers', (players) => {
     const playersList = document.getElementById('players-list');
     playersList.innerHTML = players
-        .map(player => `<div class="player-item">${player}</div>`)
+        .map(player => `<li>${player.name} - Pontos: ${player.score}</li>`)
         .join('');
 });
 
 socket.on('gameStarting', () => {
     showScreen('game-screen');
-    const countdownDisplay = document.getElementById('countdown');
+    const countdown = document.getElementById('countdown');
+    countdown.classList.remove('hidden');
     let count = 3;
-    
-    countdownDisplay.textContent = count;
-    countdownDisplay.classList.remove('hidden');
+    countdown.textContent = count;
     
     const interval = setInterval(() => {
         count--;
         if (count > 0) {
-            countdownDisplay.textContent = count;
+            countdown.textContent = count;
         } else {
             clearInterval(interval);
-            countdownDisplay.classList.add('hidden');
-            socket.emit('readyForQuestion');
+            countdown.classList.add('hidden');
         }
     }, 1000);
 });
 
-socket.on('showQuestion', (question) => {
-    showQuestion(question);
+socket.on('newQuestion', ({ question, answers, timeLeft }) => {
+    const parsedQuestion = parseContent(question);
+    document.getElementById('question-display').innerHTML = `
+        ${parsedQuestion.text}
+        ${parsedQuestion.imgUrl ? `<br><img src="${parsedQuestion.imgUrl}" alt="Imagem da pergunta">` : ''}
+    `;
     
-    const timerDisplay = document.getElementById('timer-display');
-    let timeLeft = timePerQuestion;
+    document.getElementById('timer-display').textContent = `${timeLeft} segundos`;
+    document.getElementById('result-display').classList.add('hidden');
+    document.getElementById('answers-grid').classList.remove('hidden');
     
-    timerDisplay.textContent = `Tempo: ${timeLeft}s`;
-    
-    if (countdown) {
-        clearInterval(countdown);
+    if (isHost) {
+        document.getElementById('host-next').classList.add('hidden');
     }
+
+    answers.forEach((answer, index) => {
+        const parsedAnswer = parseContent(answer);
+        const button = document.getElementById(`answer-${index}`);
+        button.innerHTML = `
+            ${parsedAnswer.imgUrl ? `<img src="${parsedAnswer.imgUrl}" alt="Imagem da resposta">` : ''}
+            ${parsedAnswer.text}
+        `;
+        button.disabled = false;
+        button.onclick = () => submitAnswer(index);
+    });
+});
+
+socket.on('updateTimer', (timeLeft) => {
+    document.getElementById('timer-display').textContent = `${timeLeft} segundos`;
+});
+
+socket.on('showResults', ({ correctIndex, players }) => {
+    document.getElementById('answers-grid').classList.add('hidden');
+    document.getElementById('result-display').classList.remove('hidden');
     
-    countdown = setInterval(() => {
-        timeLeft--;
-        timerDisplay.textContent = `Tempo: ${timeLeft}s`;
-        
-        if (timeLeft <= 0) {
-            clearInterval(countdown);
-            if (selectedAnswer === null) {
-                socket.emit('submitAnswer', null);
-            }
-        }
-    }, 1000);
-});
-
-socket.on('showResult', (result) => {
-    if (countdown) {
-        clearInterval(countdown);
+    const correctAnswer = document.getElementById(`answer-${correctIndex}`).textContent;
+    document.getElementById('correct-answer').textContent = `Resposta correta: ${correctAnswer}`;
+    
+    document.getElementById('scores').innerHTML = players
+        .map(player => `${player.name}: ${player.score} pontos`)
+        .join('<br>');
+    
+    if (isHost) {
+        document.getElementById('host-next').classList.remove('hidden');
     }
-    showResult(result);
 });
 
-socket.on('gameOver', (finalScores) => {
-    showFinalScores(finalScores);
+socket.on('gameOver', ({ players }) => {
+    showScreen('final-screen');
+    const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+    document.getElementById('final-scores').innerHTML = sortedPlayers
+        .map((player, index) => `${index + 1}º lugar - ${player.name}: ${player.score} pontos`)
+        .join('<br>');
 });
 
-socket.on('error', (message) => {
+socket.on('error', ({ message }) => {
     alert(message);
+});
+
+socket.on('hostLeft', () => {
+    alert('O host saiu da sala. O jogo foi encerrado.');
     showInitialScreen();
+});
+
+// Inicializar evento de pesquisa
+document.getElementById('quiz-search')?.addEventListener('input', (e) => {
+    loadPublicQuizzes();
 });
